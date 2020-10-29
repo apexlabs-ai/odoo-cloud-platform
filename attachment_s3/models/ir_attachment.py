@@ -9,7 +9,7 @@ import os
 from urllib.parse import urlsplit
 
 from boto3.s3.transfer import TransferConfig
-from odoo import _, api, exceptions, models
+from odoo import _, api, exceptions, models, fields
 
 from ..s3uri import S3Uri
 
@@ -28,11 +28,23 @@ except ImportError:
 class IrAttachment(models.Model):
     _inherit = "ir.attachment"
     _transfer_config = None
+    _aws_public_url = None
 
     def _get_stores(self):
         l = ['s3']
         l += super(IrAttachment, self)._get_stores()
         return l
+
+    @api.depends("store_fname", "db_datas")
+    def _compute_datas(self):
+        super(IrAttachment, self)._compute_datas()
+
+        if self._aws_public_url:
+            records = self.filtered(lambda r: r.public and r.store_fname and r.store_fname.startswith('s3://'))
+            if self.records:
+                for r in records:
+                    s3uri = S3Uri(r.store_fname)
+                    r.url = "{}/{}".format(self._aws_public_url, s3uri.item)
 
     @api.model
     def _get_s3_bucket(self, name=None):
@@ -60,9 +72,9 @@ class IrAttachment(models.Model):
         access_key = os.environ.get('AWS_ACCESS_KEY_ID')
         secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         bucket_name = name or os.environ.get('AWS_BUCKETNAME')
-
+        _s3_public_url = os.environ.get("AWS_PUBLIC_URL")
         try:
-            multipart_threshold = int(os.environ.get('AWS_MULTIPART_THRESHOLD', 0))
+            multipart_threshold = int(os.environ.get('AWS_MULTIPART_THRESHOLD'))
 
             if multipart_threshold:
                 _transfer_config = TransferConfig(multipart_threshold=1024 ** 3 * multipart_threshold)
