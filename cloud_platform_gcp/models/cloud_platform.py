@@ -47,8 +47,7 @@ class CloudPlatform(models.AbstractModel):
             "AWS_MULTIPART_THRESHOLD has to be set to max to disable multi-part operations "
             "in google cloud"
         )
-
-    super(CloudPlatform, self).check()
+        super(CloudPlatform, self).check()
 
 
     @api.model
